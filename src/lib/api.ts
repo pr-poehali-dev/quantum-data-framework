@@ -31,6 +31,8 @@ export const api = {
   updateProfile: (data: { display_name: string; bio: string }) =>
     request(AUTH_URL, '/profile', 'PUT', data),
 
+  getChannels: () => request(MESSAGES_URL, '/channels'),
+
   getChats: () => request(MESSAGES_URL, '/chats'),
 
   getMessages: (chat_id: number) =>

@@ -43,6 +43,30 @@ def handler(event: dict, context) -> dict:
 
     user_id, username, display_name, avatar_color = user
 
+    # GET /channels — публичные каналы (автовступление)
+    if method == 'GET' and path.endswith('/channels'):
+        # Автоматически добавляем пользователя во все публичные каналы
+        cur.execute("SELECT id FROM kisrod_chats WHERE is_group = TRUE")
+        all_channels = cur.fetchall()
+        for (cid,) in all_channels:
+            cur.execute("SELECT id FROM kisrod_chat_members WHERE chat_id = %s AND user_id = %s", (cid, user_id))
+            if not cur.fetchone():
+                cur.execute("INSERT INTO kisrod_chat_members (chat_id, user_id) VALUES (%s, %s)", (cid, user_id))
+        conn.commit()
+
+        cur.execute("""
+            SELECT c.id, c.name,
+                   (SELECT m.content FROM kisrod_messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC LIMIT 1) as last_msg,
+                   (SELECT COUNT(*) FROM kisrod_chat_members WHERE chat_id = c.id) as member_count
+            FROM kisrod_chats c
+            WHERE c.is_group = TRUE
+            ORDER BY c.id ASC
+        """)
+        rows = cur.fetchall()
+        channels = [{'id': r[0], 'name': r[1], 'last_message': r[2], 'member_count': r[3]} for r in rows]
+        conn.close()
+        return {'statusCode': 200, 'headers': CORS, 'body': json.dumps({'channels': channels})}
+
     # GET /chats — список чатов пользователя
     if method == 'GET' and path.endswith('/chats'):
         cur.execute("""

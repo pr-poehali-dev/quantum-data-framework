@@ -23,6 +23,13 @@ interface Chat {
   avatar_color: string;
 }
 
+interface Channel {
+  id: number;
+  name: string;
+  last_message: string | null;
+  member_count: number;
+}
+
 interface Message {
   id: number;
   content: string;
@@ -63,6 +70,8 @@ export default function Index() {
   const [registerForm, setRegisterForm] = useState({ username: '', display_name: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [sidebarTab, setSidebarTab] = useState<'dms' | 'channels'>('channels');
   const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -75,6 +84,7 @@ export default function Index() {
           setUser(data);
           setScreen('chat');
           loadChats();
+          loadChannels();
         }
       });
     }
@@ -101,6 +111,11 @@ export default function Index() {
     if (data.chats) setChats(data.chats);
   }
 
+  async function loadChannels() {
+    const data = await api.getChannels();
+    if (data.channels) setChannels(data.channels);
+  }
+
   async function openChat(chat: Chat) {
     setActiveChat(chat);
     setMobileChatOpen(true);
@@ -119,6 +134,7 @@ export default function Index() {
     setUser(data.user);
     setScreen('chat');
     loadChats();
+    loadChannels();
   }
 
   async function handleRegister(e: React.FormEvent) {
@@ -132,6 +148,7 @@ export default function Index() {
     setUser(data.user);
     setScreen('chat');
     loadChats();
+    loadChannels();
   }
 
   async function handleSend(e: React.FormEvent) {
@@ -313,49 +330,98 @@ export default function Index() {
 
       {/* Список чатов */}
       <div className={`${mobileChatOpen ? 'hidden' : 'flex'} sm:flex w-full sm:w-60 bg-[#2f3136] flex-col flex-shrink-0`}>
-        <div className="p-4 border-b border-[#202225]">
+        <div className="p-3 border-b border-[#202225]">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-white font-bold text-base">Kisrod</h2>
+            {sidebarTab === 'dms' && (
+              <button
+                onClick={() => setShowSearch(true)}
+                className="w-7 h-7 rounded flex items-center justify-center text-[#b9bbbe] hover:text-white hover:bg-[#40444b]"
+              >
+                <Icon name="Plus" size={16} />
+              </button>
+            )}
+          </div>
+          {/* Табы */}
+          <div className="flex gap-1 bg-[#202225] rounded-lg p-1">
             <button
-              onClick={() => setShowSearch(true)}
-              className="w-7 h-7 rounded flex items-center justify-center text-[#b9bbbe] hover:text-white hover:bg-[#40444b]"
+              onClick={() => setSidebarTab('channels')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-semibold transition-colors ${sidebarTab === 'channels' ? 'bg-[#5865f2] text-white' : 'text-[#8e9297] hover:text-white'}`}
             >
-              <Icon name="Plus" size={16} />
+              <Icon name="Hash" size={13} />
+              Каналы
+            </button>
+            <button
+              onClick={() => setSidebarTab('dms')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-semibold transition-colors ${sidebarTab === 'dms' ? 'bg-[#5865f2] text-white' : 'text-[#8e9297] hover:text-white'}`}
+            >
+              <Icon name="MessageCircle" size={13} />
+              Личные
             </button>
           </div>
-          <p className="text-[#8e9297] text-xs uppercase font-semibold tracking-wide">Личные сообщения</p>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {chats.length === 0 && (
-            <div className="text-center text-[#72767d] text-sm mt-8 px-4">
-              <Icon name="MessageCircle" size={32} className="mx-auto mb-2 opacity-40" />
-              <p>Нет чатов</p>
-              <p className="text-xs mt-1">Нажми + чтобы написать кому-нибудь</p>
-            </div>
+          {/* Каналы */}
+          {sidebarTab === 'channels' && (
+            <>
+              <div className="px-2 py-1.5 text-[#8e9297] text-xs font-semibold uppercase tracking-wide flex items-center gap-1">
+                <Icon name="ChevronDown" size={12} />
+                Текстовые каналы
+              </div>
+              {channels.map((ch) => (
+                <div
+                  key={ch.id}
+                  onClick={() => openChat({ id: ch.id, name: ch.name, is_group: true, last_message: ch.last_message, last_sender: null, last_time: null, avatar_color: '#5865f2' })}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded cursor-pointer transition-colors group ${activeChat?.id === ch.id ? 'bg-[#393c43] text-white' : 'text-[#8e9297] hover:bg-[#35383e] hover:text-[#dcddde]'}`}
+                >
+                  <Icon name="Hash" size={16} className="flex-shrink-0" />
+                  <span className="text-sm flex-1 truncate">{ch.name}</span>
+                  <span className="text-[#72767d] text-xs opacity-0 group-hover:opacity-100">{ch.member_count}</span>
+                </div>
+              ))}
+            </>
           )}
-          {chats.map((chat) => (
-            <div
-              key={chat.id}
-              onClick={() => openChat(chat)}
-              className={`flex items-center gap-3 px-2 py-2 rounded cursor-pointer transition-colors ${activeChat?.id === chat.id ? 'bg-[#393c43] text-white' : 'text-[#8e9297] hover:bg-[#35383e] hover:text-[#dcddde]'}`}
-            >
-              <div
-                className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                style={{ backgroundColor: chat.avatar_color }}
-              >
-                {getInitial(chat.name)}
+
+          {/* Личные сообщения */}
+          {sidebarTab === 'dms' && (
+            <>
+              <div className="px-2 py-1.5 text-[#8e9297] text-xs font-semibold uppercase tracking-wide flex items-center justify-between">
+                <span>Личные сообщения</span>
+                <button onClick={() => setShowSearch(true)} className="hover:text-white">
+                  <Icon name="Plus" size={13} />
+                </button>
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium text-white truncate">{chat.name}</div>
-                {chat.last_message && (
-                  <div className="text-xs text-[#72767d] truncate">
-                    {chat.last_sender}: {chat.last_message}
+              {chats.length === 0 && (
+                <div className="text-center text-[#72767d] text-sm mt-6 px-4">
+                  <Icon name="MessageCircle" size={28} className="mx-auto mb-2 opacity-40" />
+                  <p className="text-xs">Нажми + чтобы написать кому-нибудь</p>
+                </div>
+              )}
+              {chats.map((chat) => (
+                <div
+                  key={chat.id}
+                  onClick={() => openChat(chat)}
+                  className={`flex items-center gap-3 px-2 py-2 rounded cursor-pointer transition-colors ${activeChat?.id === chat.id ? 'bg-[#393c43] text-white' : 'text-[#8e9297] hover:bg-[#35383e] hover:text-[#dcddde]'}`}
+                >
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                    style={{ backgroundColor: chat.avatar_color }}
+                  >
+                    {getInitial(chat.name)}
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{chat.name}</div>
+                    {chat.last_message && (
+                      <div className="text-xs text-[#72767d] truncate">
+                        {chat.last_message}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         {user && (
@@ -389,13 +455,20 @@ export default function Index() {
               >
                 <Icon name="ArrowLeft" size={20} />
               </button>
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-                style={{ backgroundColor: activeChat.avatar_color }}
-              >
-                {getInitial(activeChat.name)}
-              </div>
+              {activeChat.is_group ? (
+                <Icon name="Hash" size={20} className="text-[#8e9297] flex-shrink-0" />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                  style={{ backgroundColor: activeChat.avatar_color }}
+                >
+                  {getInitial(activeChat.name)}
+                </div>
+              )}
               <span className="text-white font-semibold">{activeChat.name}</span>
+              {activeChat.is_group && (
+                <span className="text-[#8e9297] text-sm hidden sm:block">· публичный канал</span>
+              )}
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
