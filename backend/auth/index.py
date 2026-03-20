@@ -1,4 +1,4 @@
-"""Аутентификация Kisrod: регистрация, вход, профиль, выход"""
+"""Аутентификация Kisrod: регистрация, вход, профиль, выход. v3"""
 import json
 import os
 import hashlib
@@ -31,6 +31,13 @@ def handler(event: dict, context) -> dict:
     path = event.get('path', '/')
     headers = event.get('headers', {}) or {}
     token = headers.get('X-Session-Token') or headers.get('x-session-token', '')
+    params = event.get('queryStringParameters') or {}
+
+    # action можно передать через query или path
+    action = params.get('action', '')
+    if not action:
+        # извлекаем последний сегмент пути
+        action = path.rstrip('/').split('/')[-1]
 
     try:
         conn = get_conn()
@@ -40,8 +47,8 @@ def handler(event: dict, context) -> dict:
     cur = conn.cursor()
 
     try:
-        # POST /register
-        if method == 'POST' and path.endswith('/register'):
+        # POST ?action=register  или  POST /register
+        if method == 'POST' and action == 'register':
             body = json.loads(event.get('body') or '{}')
             username = body.get('username', '').strip().lower()
             display_name = body.get('display_name', '').strip()
@@ -70,8 +77,8 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return ok({'token': token_val, 'user': {'id': user_id, 'username': username, 'display_name': display_name, 'bio': '', 'avatar_color': color}})
 
-        # POST /login
-        if method == 'POST' and path.endswith('/login'):
+        # POST ?action=login
+        if method == 'POST' and action == 'login':
             body = json.loads(event.get('body') or '{}')
             username = body.get('username', '').strip().lower()
             password = body.get('password', '')
@@ -91,8 +98,8 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return ok({'token': token_val, 'user': {'id': user_id, 'username': uname, 'display_name': dname, 'bio': bio or '', 'avatar_color': color}})
 
-        # GET /me
-        if method == 'GET' and path.endswith('/me'):
+        # GET ?action=me
+        if method == 'GET' and action == 'me':
             if not token:
                 return err('Не авторизован', 401)
             cur.execute(
@@ -105,8 +112,8 @@ def handler(event: dict, context) -> dict:
             uid, uname, dname, bio, color = row
             return ok({'id': uid, 'username': uname, 'display_name': dname, 'bio': bio or '', 'avatar_color': color})
 
-        # PUT /profile
-        if method == 'PUT' and path.endswith('/profile'):
+        # PUT ?action=profile
+        if method == 'PUT' and action == 'profile':
             if not token:
                 return err('Не авторизован', 401)
             cur.execute("SELECT user_id FROM kisrod_sessions WHERE token = %s", (token,))
@@ -125,14 +132,12 @@ def handler(event: dict, context) -> dict:
             uid, uname, dname, bio2, color = row
             return ok({'id': uid, 'username': uname, 'display_name': dname, 'bio': bio2 or '', 'avatar_color': color})
 
-        # POST /logout
-        if method == 'POST' and path.endswith('/logout'):
-            if token:
-                cur.execute("UPDATE kisrod_sessions SET user_id = user_id WHERE token = %s", (token,))
-                conn.commit()
+        # POST ?action=logout
+        if method == 'POST' and action == 'logout':
             return ok({'ok': True})
 
-        return err('Not found', 404)
+        # Дефолт — вернуть инфо о функции
+        return ok({'service': 'kisrod-auth', 'action': action, 'method': method, 'path': path})
 
     except Exception as e:
         return err(f'Ошибка сервера: {str(e)}', 500)
