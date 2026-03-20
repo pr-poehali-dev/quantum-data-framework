@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "Get rooms unauthorized",
+      "method": "GET",
+      "path": "/?action=rooms",
+      "expectedStatus": 401,
+      "expectedBody": {"error": "string"},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
