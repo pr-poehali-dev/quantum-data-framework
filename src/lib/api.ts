@@ -6,15 +6,19 @@ function getToken() {
 }
 
 async function request(url: string, path: string, method = 'GET', body?: object) {
-  const res = await fetch(url + path, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Session-Token': getToken(),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  return res.json();
+  try {
+    const res = await fetch(url + path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Session-Token': getToken(),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return res.json();
+  } catch {
+    return { error: 'Нет соединения с сервером. Попробуй ещё раз.' };
+  }
 }
 
 export const api = {
